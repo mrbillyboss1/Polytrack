@@ -2,7 +2,8 @@ import streamlit as st
 import feedparser
 import urllib.parse
 import requests
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from groq import Groq
 from email.utils import parsedate_to_datetime
 
@@ -19,7 +20,6 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
 
-/* Base */
 html, body, [class*="css"] {
     font-family: 'DM Sans', sans-serif;
     color: #e8eaf0;
@@ -30,13 +30,11 @@ html, body, [class*="css"] {
     min-height: 100vh;
 }
 
-/* Supprime fond blanc Streamlit */
 .block-container {
     padding-top: 2rem;
     max-width: 1200px;
 }
 
-/* Titre principal */
 h1 {
     font-family: 'Syne', sans-serif !important;
     font-weight: 800 !important;
@@ -48,7 +46,6 @@ h1 {
     letter-spacing: -0.5px;
 }
 
-/* Sous-titres catégories */
 h2, h3 {
     font-family: 'Syne', sans-serif !important;
     font-weight: 700 !important;
@@ -59,7 +56,6 @@ h2, h3 {
     margin-top: 2rem !important;
 }
 
-/* Cards glass pour les articles */
 .glass-card {
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -79,7 +75,6 @@ h2, h3 {
     transform: translateY(-1px);
 }
 
-/* Titre article */
 .article-title {
     font-family: 'Syne', sans-serif;
     font-weight: 600;
@@ -89,7 +84,6 @@ h2, h3 {
     line-height: 1.4;
 }
 
-/* Meta infos (source + heure) */
 .article-meta {
     display: flex;
     gap: 1rem;
@@ -117,7 +111,6 @@ h2, h3 {
     gap: 4px;
 }
 
-/* Lien article */
 .article-link {
     color: #34d399 !important;
     font-size: 0.78rem;
@@ -126,7 +119,6 @@ h2, h3 {
     letter-spacing: 0.3px;
 }
 
-/* Résumé article */
 .article-summary {
     color: #94a3b8;
     font-size: 0.82rem;
@@ -136,7 +128,6 @@ h2, h3 {
     padding-top: 0.5rem;
 }
 
-/* Analyse IA */
 .ia-block {
     background: rgba(167, 139, 250, 0.06);
     border: 1px solid rgba(167, 139, 250, 0.2);
@@ -145,28 +136,12 @@ h2, h3 {
     margin-top: 0.8rem;
 }
 
-.ia-section-title {
-    font-family: 'Syne', sans-serif;
-    font-size: 0.72rem;
-    font-weight: 700;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-    margin-top: 0.8rem;
-}
-
-.ia-key { color: #60a5fa; }
-.ia-action { color: #34d399; }
-.ia-number { color: #f59e0b; }
-
-/* Divider */
 hr {
     border: none;
     border-top: 1px solid rgba(255,255,255,0.07);
     margin: 2rem 0;
 }
 
-/* Boutons Streamlit */
 .stButton > button {
     background: rgba(96, 165, 250, 0.1) !important;
     border: 1px solid rgba(96, 165, 250, 0.3) !important;
@@ -185,7 +160,6 @@ hr {
     transform: translateY(-1px) !important;
 }
 
-/* Bouton primaire */
 .stButton > button[kind="primary"] {
     background: linear-gradient(135deg, rgba(96,165,250,0.25), rgba(167,139,250,0.25)) !important;
     border: 1px solid rgba(167, 139, 250, 0.4) !important;
@@ -194,32 +168,31 @@ hr {
     padding: 0.6rem 1.8rem !important;
 }
 
-/* Spinner */
-.stSpinner > div {
-    border-color: #60a5fa !important;
-}
-
-/* Caption */
-.stCaption, [data-testid="stCaptionContainer"] {
-    color: #475569 !important;
-    font-size: 0.8rem !important;
-}
-
-/* Cacher éléments Streamlit inutiles */
+.stSpinner > div { border-color: #60a5fa !important; }
+.stCaption, [data-testid="stCaptionContainer"] { color: #475569 !important; font-size: 0.8rem !important; }
 #MainMenu, footer, header { visibility: hidden; }
 
-/* Analyse globale box */
 .global-ia-box {
     background: rgba(52, 211, 153, 0.05);
     border: 1px solid rgba(52, 211, 153, 0.2);
     border-radius: 16px;
     padding: 1.5rem 2rem;
 }
+
+.no-articles {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 1rem 1.4rem;
+    color: #475569;
+    font-size: 0.82rem;
+    text-align: center;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------
-# Config
+# Config API
 # -----------------------------------------------
 try:
     groq_key = st.secrets["GROQ_API_KEY"]
@@ -238,9 +211,13 @@ HEADERS = {
     "Referer": "https://news.google.com/",
 }
 
+# -----------------------------------------------
+# Fonctions utilitaires
+# -----------------------------------------------
 def get_google_news_url(query):
     encoded_query = urllib.parse.quote(query)
-    return f"https://news.google.com/rss/search?q={encoded_query}&hl=en&gl=US&ceid=US:en"
+    three_months_ago = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
+    return f"https://news.google.com/rss/search?q={encoded_query}+after:{three_months_ago}&hl=en&gl=US&ceid=US:en"
 
 def fetch_feed(url):
     try:
@@ -254,13 +231,24 @@ def fetch_feed(url):
         st.warning(f"Erreur : {str(e)}")
         return None
 
+def is_recent(entry, max_days=90):
+    """Filtre côté Python — double sécurité après le filtre URL."""
+    for field in ['published', 'updated', 'created']:
+        raw = entry.get(field, '')
+        if raw:
+            try:
+                dt = parsedate_to_datetime(raw)
+                now = datetime.now(dt.tzinfo)
+                return (now - dt).days <= max_days
+            except:
+                pass
+    return True  # Pas de date = on garde
+
 def extract_source(entry):
-    """Extrait le nom de la source depuis le flux RSS."""
     if hasattr(entry, 'source') and hasattr(entry.source, 'title'):
         return entry.source.title
     if hasattr(entry, 'tags') and entry.tags:
         return entry.tags[0].get('term', '')
-    # Extrait depuis l'URL
     link = entry.get('link', '')
     try:
         from urllib.parse import urlparse
@@ -270,7 +258,6 @@ def extract_source(entry):
         return "Source inconnue"
 
 def format_date(entry):
-    """Formate la date de publication."""
     for field in ['published', 'updated', 'created']:
         raw = entry.get(field, '')
         if raw:
@@ -284,6 +271,8 @@ def format_date(entry):
                     return f"il y a {mins}min"
                 elif hours < 24:
                     return f"il y a {hours}h"
+                elif delta.days < 7:
+                    return f"il y a {delta.days}j"
                 else:
                     return dt.strftime("%d %b %Y")
             except:
@@ -292,7 +281,7 @@ def format_date(entry):
 
 def ask_groq(prompt, api_key):
     if not api_key:
-        return None
+        return "Erreur : Clé API manquante."
     try:
         client = Groq(api_key=api_key)
         completion = client.chat.completions.create(
@@ -313,21 +302,11 @@ def ask_groq(prompt, api_key):
     except Exception as e:
         return f"Erreur IA : {str(e)}"
 
-def parse_ia_response(text):
-    """Affiche la réponse IA avec les sections colorées."""
-    sections = {
-        "messages_clés": ("💬 Messages clés", "ia-key"),
-        "actions": ("⚡ Actions concrètes", "ia-action"),
-        "chiffres": ("📊 Chiffres & données", "ia-number"),
-    }
-    # Affichage brut mais stylé si pas de parsing possible
-    st.markdown(f'<div class="ia-block">{text}</div>', unsafe_allow_html=True)
-
 # -----------------------------------------------
 # Header
 # -----------------------------------------------
 st.markdown("<h1>📊 PolyTrack — Synthetic Intelligence</h1>", unsafe_allow_html=True)
-st.caption("Focus : rPET · rNylon · Recyclage Chimique · Sourcing Asie/USA/Europe")
+st.caption("Focus : rPET · rNylon · Recyclage Chimique · Sourcing Asie/USA/Europe — 3 derniers mois")
 
 SOURCES = {
     "🌏 Asia Sourcing & Prices": get_google_news_url("recycled polyester rPET price China Vietnam India"),
@@ -339,27 +318,32 @@ SOURCES = {
 all_articles_text = []
 
 # -----------------------------------------------
-# Flux RSS
+# Affichage des flux RSS
 # -----------------------------------------------
 for category, url in SOURCES.items():
     st.markdown(f"### {category}")
     feed = fetch_feed(url)
 
     if feed is None or len(feed.entries) == 0:
-        st.info("Aucun article trouvé.")
+        st.markdown('<div class="no-articles">Aucun article trouvé.</div>', unsafe_allow_html=True)
+        continue
+
+    # ✅ Double filtre : URL (after:) + Python (is_recent)
+    recent_entries = [e for e in feed.entries if is_recent(e)][:5]
+
+    if not recent_entries:
+        st.markdown('<div class="no-articles">Aucun article récent (3 mois) trouvé.</div>', unsafe_allow_html=True)
         continue
 
     category_texts = []
 
-    for i, entry in enumerate(feed.entries[:5]):
+    for i, entry in enumerate(recent_entries):
         title = entry.get("title", "Sans titre")
         link = entry.get("link", "#")
         summary = entry.get("summary", "")
         source = extract_source(entry)
         pub_date = format_date(entry)
 
-        # Nettoyage summary HTML basique
-        import re
         clean_summary = re.sub(r'<[^>]+>', '', summary)[:300]
 
         card_html = f"""
@@ -375,7 +359,6 @@ for category, url in SOURCES.items():
         """
         st.markdown(card_html, unsafe_allow_html=True)
 
-        # Bouton analyse IA par article
         btn_key = f"ia_{category}_{i}"
         if st.button("🤖 Analyser", key=btn_key):
             with st.spinner("Analyse en cours..."):
@@ -399,8 +382,10 @@ Réponds UNIQUEMENT avec ce format exact :
 • [chiffre ou donnée clé mentionnée, ou "Aucun chiffre disponible"]
 """
                 result = ask_groq(prompt, groq_key)
-            if result:
-                st.markdown(f'<div class="ia-block"><pre style="font-family:DM Sans,sans-serif;white-space:pre-wrap;font-size:0.85rem;color:#cbd5e1;">{result}</pre></div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="ia-block"><pre style="font-family:DM Sans,sans-serif;white-space:pre-wrap;font-size:0.85rem;color:#cbd5e1;line-height:1.7;">{result}</pre></div>',
+                unsafe_allow_html=True
+            )
 
         category_texts.append(f"- {title} : {clean_summary[:200]}")
 
@@ -411,7 +396,7 @@ Réponds UNIQUEMENT avec ce format exact :
 # -----------------------------------------------
 st.markdown("---")
 st.markdown("### 🧠 Analyse IA Globale")
-st.caption("Synthèse de toutes les actualités collectées")
+st.caption("Synthèse macro de toutes les actualités des 3 derniers mois")
 
 if st.button("🚀 Lancer l'analyse globale", type="primary"):
     if not all_articles_text:
@@ -419,7 +404,7 @@ if st.button("🚀 Lancer l'analyse globale", type="primary"):
     else:
         with st.spinner("Analyse macro en cours..."):
             full_text = "\n".join(all_articles_text)
-            prompt = f"""Voici un agrégat d'actualités sur le textile synthétique recyclé :
+            prompt = f"""Voici un agrégat d'actualités récentes (3 derniers mois) sur le textile synthétique recyclé :
 
 {full_text}
 
@@ -444,5 +429,7 @@ Réponds UNIQUEMENT avec ce format :
 • [marché 2 : raison]
 """
             result = ask_groq(prompt, groq_key)
-        if result:
-            st.markdown(f'<div class="global-ia-box"><pre style="font-family:DM Sans,sans-serif;white-space:pre-wrap;font-size:0.88rem;color:#e2e8f0;line-height:1.7;">{result}</pre></div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="global-ia-box"><pre style="font-family:DM Sans,sans-serif;white-space:pre-wrap;font-size:0.88rem;color:#e2e8f0;line-height:1.7;">{result}</pre></div>',
+            unsafe_allow_html=True
+        )
