@@ -40,8 +40,9 @@ st.title("📊 PolyTrack : Synthetic & Asian Sourcing")
 st.caption("Focus : Recyclage Chimique, rPET, rNylon et Start-up (Asie/USA/Europe)")
 
 # Sources ciblées sur le synthétique et l'approvisionnement asiatique
-SOURCES = {
+    SOURCES = {
     "Asia Sourcing & Prices": get_google_news_url("recycled polyester rPET price China Vietnam India"),
     "Synthetic Chemical Recycling": get_google_news_url("chemical recycling polyester polyamide textile startup"),
-    "T2T Synthetic Innovation": get_google_news_url("textile-to-textile recycling synthetic
-                                                    
+    "T2T Synthetic Innovation": get_google_news_url("textile-to-textile recycling synthetic fiber rNylon rPET"),
+    "Standards (Synthetic Focus)": get_google_news_url("\"Textile Exchange\" GRS RCS synthetic recycled fiber")
+}
