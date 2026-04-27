@@ -10,7 +10,7 @@ from email.utils import parsedate_to_datetime
 st.set_page_config(
     page_title="PolyTrack Synthetic Intelligence",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # -----------------------------------------------
@@ -169,7 +169,12 @@ hr {
 }
 
 .stSpinner > div { border-color: #60a5fa !important; }
-.stCaption, [data-testid="stCaptionContainer"] { color: #475569 !important; font-size: 0.8rem !important; }
+
+.stCaption, [data-testid="stCaptionContainer"] {
+    color: #475569 !important;
+    font-size: 0.8rem !important;
+}
+
 #MainMenu, footer, header { visibility: hidden; }
 
 .global-ia-box {
@@ -188,6 +193,27 @@ hr {
     font-size: 0.82rem;
     text-align: center;
 }
+
+/* Sidebar */
+.stSidebar {
+    background: rgba(10, 14, 26, 0.95) !important;
+    border-right: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+.stSidebar [data-testid="stMarkdownContainer"] p {
+    color: #93c5fd !important;
+    font-family: 'Syne', sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+.stMultiSelect > div {
+    background: rgba(255,255,255,0.04) !important;
+    border: 1px solid rgba(255,255,255,0.08) !important;
+    border-radius: 10px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -200,17 +226,6 @@ except:
     groq_key = None
     st.error("Clé GROQ_API_KEY manquante dans les Secrets.")
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/122.0.0.0 Safari/537.36"
-    ),
-    "Accept": "application/rss+xml, application/xml, text/xml, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Referer": "https://news.google.com/",
-}
-
 # -----------------------------------------------
 # Fonctions utilitaires
 # -----------------------------------------------
@@ -219,20 +234,50 @@ def get_google_news_url(query):
     three_months_ago = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
     return f"https://news.google.com/rss/search?q={encoded_query}+after:{three_months_ago}&hl=en&gl=US&ceid=US:en"
 
+def get_direct_rss(url):
+    return url
+
 def fetch_feed(url):
+    is_google = "news.google.com" in url
+
+    headers_google = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/122.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/rss+xml, application/xml, text/xml, */*",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Referer": "https://news.google.com/",
+    }
+
+    headers_direct = {
+        "User-Agent": (
+            "Mozilla/5.0 (compatible; RSSReader/1.0; +https://polytrack.app)"
+        ),
+        "Accept": "application/rss+xml, application/xml, text/xml, */*",
+    }
+
+    headers = headers_google if is_google else headers_direct
+
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         return feedparser.parse(response.content)
     except requests.exceptions.HTTPError as e:
-        st.warning(f"Erreur HTTP {e.response.status_code}")
-        return None
+        try:
+            return feedparser.parse(url)
+        except:
+            st.warning(f"Erreur HTTP {e.response.status_code} — source indisponible")
+            return None
     except Exception as e:
-        st.warning(f"Erreur : {str(e)}")
-        return None
+        try:
+            return feedparser.parse(url)
+        except:
+            st.warning(f"Erreur connexion : {str(e)}")
+            return None
 
 def is_recent(entry, max_days=90):
-    """Filtre côté Python — double sécurité après le filtre URL."""
     for field in ['published', 'updated', 'created']:
         raw = entry.get(field, '')
         if raw:
@@ -242,7 +287,7 @@ def is_recent(entry, max_days=90):
                 return (now - dt).days <= max_days
             except:
                 pass
-    return True  # Pas de date = on garde
+    return True
 
 def extract_source(entry):
     if hasattr(entry, 'source') and hasattr(entry.source, 'title'):
@@ -303,36 +348,103 @@ def ask_groq(prompt, api_key):
         return f"Erreur IA : {str(e)}"
 
 # -----------------------------------------------
+# Sources RSS
+# -----------------------------------------------
+SOURCES = {
+    # Sources originales Google News
+    "🌏 Asia Sourcing & Prices": get_google_news_url(
+        "recycled polyester rPET price China Vietnam India"
+    ),
+    "⚗️ Chemical Recycling": get_google_news_url(
+        "chemical recycling polyester polyamide textile startup"
+    ),
+    "🔄 T2T Synthetic Innovation": get_google_news_url(
+        "textile-to-textile recycling synthetic fiber rNylon rPET"
+    ),
+    "📋 Standards & Certifications": get_google_news_url(
+        '"Textile Exchange" GRS RCS synthetic recycled fiber'
+    ),
+    "🧵 rNylon & Polyamide": get_google_news_url(
+        "recycled nylon polyamide 6 Econyl Aquafil circular"
+    ),
+    "📈 Commodity Prices": get_google_news_url(
+        "PET resin price recycled feedstock crude oil impact textile"
+    ),
+    "🧪 rPET Innovation": get_google_news_url(
+        "rPET bottle-to-fiber innovation capacity expansion"
+    ),
+    "🇨🇳 China Synthetic Market": get_google_news_url(
+        "China polyester filament yarn price export"
+    ),
+    "💡 Startups Matériaux": get_google_news_url(
+        "recycled synthetic fiber sustainable material startup funding"
+    ),
+
+    # Flux RSS directs — médias spécialisés
+    "🌿 Ecotextile News": get_direct_rss(
+        "https://www.ecotextile.com/rss.xml"
+    ),
+    "📊 Fibre2Fashion": get_direct_rss(
+        "https://www.fibre2fashion.com/rss/news.xml"
+    ),
+    "🔬 Textile World": get_direct_rss(
+        "https://www.textileworld.com/feed/"
+    ),
+    "🌍 Textile Exchange": get_direct_rss(
+        "https://textileexchange.org/feed/"
+    ),
+    "🏭 Just Style": get_direct_rss(
+        "https://www.just-style.com/feed/"
+    ),
+}
+
+# -----------------------------------------------
 # Header
 # -----------------------------------------------
 st.markdown("<h1>📊 PolyTrack — Synthetic Intelligence</h1>", unsafe_allow_html=True)
 st.caption("Focus : rPET · rNylon · Recyclage Chimique · Sourcing Asie/USA/Europe — 3 derniers mois")
 
-SOURCES = {
-    "🌏 Asia Sourcing & Prices": get_google_news_url("recycled polyester rPET price China Vietnam India"),
-    "⚗️ Chemical Recycling": get_google_news_url("chemical recycling polyester polyamide textile startup"),
-    "🔄 T2T Synthetic Innovation": get_google_news_url("textile-to-textile recycling synthetic fiber rNylon rPET"),
-    "📋 Standards & Certifications": get_google_news_url('"Textile Exchange" GRS RCS synthetic recycled fiber'),
-}
+# -----------------------------------------------
+# Sidebar — Filtres
+# -----------------------------------------------
+st.sidebar.markdown("## 🔍 Filtrer les sources")
+st.sidebar.caption("Sélectionne les catégories à afficher")
 
-all_articles_text = []
+all_categories = list(SOURCES.keys())
+selected = st.sidebar.multiselect(
+    "Catégories",
+    options=all_categories,
+    default=all_categories[:5],
+    label_visibility="collapsed"
+)
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("## ⚙️ Paramètres")
+max_articles = st.sidebar.slider("Articles par source", 3, 10, 5)
+max_days = st.sidebar.slider("Période (jours)", 7, 90, 90)
 
 # -----------------------------------------------
 # Affichage des flux RSS
 # -----------------------------------------------
-for category, url in SOURCES.items():
+all_articles_text = []
+active_sources = {k: v for k, v in SOURCES.items() if k in selected}
+
+if not active_sources:
+    st.info("Sélectionne au moins une source dans la sidebar.")
+    st.stop()
+
+for category, url in active_sources.items():
     st.markdown(f"### {category}")
     feed = fetch_feed(url)
 
     if feed is None or len(feed.entries) == 0:
-        st.markdown('<div class="no-articles">Aucun article trouvé.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="no-articles">⚠️ Aucun article trouvé pour cette source.</div>', unsafe_allow_html=True)
         continue
 
-    # ✅ Double filtre : URL (after:) + Python (is_recent)
-    recent_entries = [e for e in feed.entries if is_recent(e)][:5]
+    recent_entries = [e for e in feed.entries if is_recent(e, max_days)][:max_articles]
 
     if not recent_entries:
-        st.markdown('<div class="no-articles">Aucun article récent (3 mois) trouvé.</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="no-articles">⚠️ Aucun article récent ({max_days}j) trouvé.</div>', unsafe_allow_html=True)
         continue
 
     category_texts = []
@@ -343,7 +455,6 @@ for category, url in SOURCES.items():
         summary = entry.get("summary", "")
         source = extract_source(entry)
         pub_date = format_date(entry)
-
         clean_summary = re.sub(r'<[^>]+>', '', summary)[:300]
 
         card_html = f"""
@@ -379,7 +490,7 @@ Réponds UNIQUEMENT avec ce format exact :
 • [action 2]
 
 📊 CHIFFRES & DONNÉES
-• [chiffre ou donnée clé mentionnée, ou "Aucun chiffre disponible"]
+• [chiffre ou donnée clé, ou "Aucun chiffre disponible"]
 """
                 result = ask_groq(prompt, groq_key)
             st.markdown(
@@ -396,7 +507,7 @@ Réponds UNIQUEMENT avec ce format exact :
 # -----------------------------------------------
 st.markdown("---")
 st.markdown("### 🧠 Analyse IA Globale")
-st.caption("Synthèse macro de toutes les actualités des 3 derniers mois")
+st.caption(f"Synthèse de toutes les actualités · {max_days} derniers jours")
 
 if st.button("🚀 Lancer l'analyse globale", type="primary"):
     if not all_articles_text:
@@ -404,7 +515,7 @@ if st.button("🚀 Lancer l'analyse globale", type="primary"):
     else:
         with st.spinner("Analyse macro en cours..."):
             full_text = "\n".join(all_articles_text)
-            prompt = f"""Voici un agrégat d'actualités récentes (3 derniers mois) sur le textile synthétique recyclé :
+            prompt = f"""Voici un agrégat d'actualités récentes sur le textile synthétique recyclé :
 
 {full_text}
 
