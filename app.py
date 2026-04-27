@@ -231,8 +231,9 @@ except:
 # -----------------------------------------------
 def get_google_news_url(query):
     encoded_query = urllib.parse.quote(query)
-    three_months_ago = (datetime.now() - timedelta(days=90)).strftime("%Y-%m-%d")
-    return f"https://news.google.com/rss/search?q={encoded_query}+after:{three_months_ago}&hl=en&gl=US&ceid=US:en"
+    # "when:90d" est le bon paramètre natif Google News RSS
+    # "after:" cassait les résultats sur certaines requêtes
+    return f"https://news.google.com/rss/search?q={encoded_query}+when:90d&hl=en&gl=US&ceid=US:en"
 
 def get_direct_rss(url):
     return url
