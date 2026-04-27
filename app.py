@@ -352,37 +352,40 @@ def ask_groq(prompt, api_key):
 # Sources RSS
 # -----------------------------------------------
 SOURCES = {
-    # Sources originales Google News
+    # ── Google News — requêtes élargies ────────────────────
     "🌏 Asia Sourcing & Prices": get_google_news_url(
-        "recycled polyester rPET price China Vietnam India"
+        "rPET polyester China sourcing price"
     ),
     "⚗️ Chemical Recycling": get_google_news_url(
-        "chemical recycling polyester polyamide textile startup"
+        "chemical recycling textile polyester"
     ),
-    "🔄 T2T Synthetic Innovation": get_google_news_url(
-        "textile-to-textile recycling synthetic fiber rNylon rPET"
+    "🔄 T2T Innovation": get_google_news_url(
+        "textile recycling synthetic fiber"
     ),
     "📋 Standards & Certifications": get_google_news_url(
-        '"Textile Exchange" GRS RCS synthetic recycled fiber'
+        "GRS recycled fiber certification textile"
     ),
     "🧵 rNylon & Polyamide": get_google_news_url(
-        "recycled nylon polyamide 6 Econyl Aquafil circular"
+        "recycled nylon Econyl polyamide"
     ),
     "📈 Commodity Prices": get_google_news_url(
-        "PET resin price recycled feedstock crude oil impact textile"
+        "PET resin price recycled textile"
     ),
     "🧪 rPET Innovation": get_google_news_url(
-        "rPET bottle-to-fiber innovation capacity expansion"
+        "rPET innovation recycling fiber"
     ),
-    "🇨🇳 China Synthetic Market": get_google_news_url(
-        "China polyester filament yarn price export"
+    "🇨🇳 China Market": get_google_news_url(
+        "China polyester yarn export price"
     ),
-    "💡 Startups Matériaux": get_google_news_url(
-        "recycled synthetic fiber sustainable material startup funding"
+    "💡 Startups": get_google_news_url(
+        "sustainable fiber startup recycled material"
+    ),
+    "🌿 Sustainability Fashion": get_google_news_url(
+        "sustainable fashion recycled synthetic brand"
     ),
 
-    # Flux RSS directs — médias spécialisés
-    "🌿 Ecotextile News": get_direct_rss(
+    # ── Flux RSS directs ────────────────────────────────────
+    "📰 Ecotextile News": get_direct_rss(
         "https://www.ecotextile.com/rss.xml"
     ),
     "📊 Fibre2Fashion": get_direct_rss(
